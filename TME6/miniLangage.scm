@@ -61,6 +61,11 @@
 
 (define (chiffre? c)        (equal? (vector-ref c 0) 'chiffre))
 
+;ADD
+(define (swap? v) 									(equal? (vector-ref v 0) 'swap))
+(define (alternative? be)    				(equal? (vector-ref be 0) 'alternative))
+(define (arith-if? i) 								(equal? (vector-ref i 0) 'arith-if))
+
 (define (make-seq i1 i2)           (vector 'seq i1 i2))
 (define (make-si be i1 i2)         (vector 'si be i1 i2))
 (define (make-tant-que be i)       (vector 'tant-que be i))
@@ -73,6 +78,7 @@
 (define (make-constante n)         (vector 'constante n))
 (define (make-identificateur s)    (vector 'identificateur s))
 
+
 (define (make-et be1 be2)          (vector 'et be1 be2))
 (define (make-ou be1 be2)          (vector 'ou be1 be2))
 (define (make-plus-petit e1 e2)    (vector 'plus-petit e1 e2))
@@ -83,6 +89,12 @@
 (define (make-simple c)            (vector 'simple c))
 (define (make-chiffre c)           (vector 'chiffre c))
 
+;ADD
+(define (make-alternative be1 e2 e3) (vector 'alternative be1 e2 e3))
+(define (make-swap v1 v2) (vector 'swap v1 v2))
+(define (make-arith-if e1 i1 i2 i3) (vector 'arith-if e1 i1 i2 i3))
+
+
 (define (seq->i1 i)         (vector-ref i 1))
 (define (seq->i2 i)         (vector-ref i 2))
 (define (si->be i)          (vector-ref i 1))
@@ -92,6 +104,17 @@
 (define (tant-que->i i)     (vector-ref i 2))
 (define (affectation->i i)  (vector-ref i 1))
 (define (affectation->e i)  (vector-ref i 2))
+
+;ADD
+(define (alternative->be1 be) (vector-ref be 1))
+(define (alternative->e2 e) (vector-ref e 2))
+(define (alternative->e3 e) (vector-ref e 3))
+(define (swap->v1 v) 					(vector-ref v 1))
+(define (swap->v2 v) 					(vector-ref v 2))
+(define (arith-if->e1 e) (vector-ref e 1))
+(define (arith-if->i1 i) (vector-ref i 2))
+(define (arith-if->i2 i) (vector-ref i 3))
+(define (arith-if->i3 i) (vector-ref i 4))
 
 (define (plus->e1 e)          (vector-ref e 1))
 (define (plus->e2 e)          (vector-ref e 2))
@@ -177,6 +200,8 @@
         ((si? i)          (execute-si i))
         ((tant-que? i)    (execute-tant-que i))
         ((affectation? i) (execute-affectation i))
+				((swap? i) 				(execute-swap i))
+				((arith-if? i)		(execute-arith-if i))
         (else             (begin
                             (display "erreur : instruction inconnue : ")
                             (display i) (newline)))))
@@ -210,6 +235,32 @@
       (((updateStore sigma) (rho (affectation->i i)))
                               (((eval (affectation->e i)) rho) sigma)))))
 
+;ADD
+(define (execute-swap i)
+	(lambda (rho)
+		(lambda (sigma)
+			(let (
+							(l1 (rho (swap->v1 i)))
+							(l2 (rho (swap->v2 i)))
+					 )
+				 		(((updateStore (((updateStore sigma) l1) (sigma l2))) l2) (sigma l1))
+			)
+		)
+	)
+)
+			
+(define (execute-arith-if i)
+	(lambda (rho)
+		(lambda (sigma)
+			(let (
+							(n ( ((eval (arith-if->e1 i)) rho) sigma))
+						)
+						(if  (< n 0)
+								 (((execute (arith-if->i1 i))rho)sigma)
+									(if ( = n 0)
+									 	(((execute (arith-if->i2 i))rho)sigma)
+									 	(((execute (arith-if->i3 i))rho)sigma)))))))
+
 
 
 (define (eval e)
@@ -219,6 +270,7 @@
         ((divise-par? e)     (eval-divise-par e))
         ((constante? e)      (eval-constante e))
         ((identificateur? e) (eval-identificateur e))
+				((alternative? e) 		 (eval-alternative e))
         (else                (begin
                                (display "erreur : expression inconnue : ")
                                (display e) (newline)))))
@@ -257,6 +309,13 @@
     (lambda (sigma)
       (sigma (rho e)))))
 
+(define (eval-alternative be)
+	(lambda (rho)
+    (lambda (sigma)
+			(if (((beval (alternative->be1 be))rho)sigma) 
+					(((eval (alternative->e2 be))rho)sigma) 
+					(((eval (alternative->e3 be))rho) sigma)
+			))))
 
 
 (define (beval be)
@@ -360,6 +419,11 @@
 (define const10 
 	(make-constante dix))
 
+(define zero
+ (make-simple (make-chiffre 'zero)))
+(define const0
+	(make-constante zero))
+
 (define sept
 	(make-simple (make-chiffre 'sept)))
 (define const7
@@ -376,7 +440,7 @@
 	(make-constante huit))
 
 (define exp10pluspetit8 
-	(make-plus-petit const10 const8))
+	(make-plus-petit const8 const10))
 
 
 (begin (display "exp10pluspetit8 : ")
@@ -445,12 +509,50 @@
 		(make-affectation id-c id-x)
   ))
 
+(define affect10
+	(make-affectation id-c const10))
+
+(define affect5
+	(make-affectation id-c const5))
+
+(define affect7
+	(make-affectation id-c const7))
+
 (begin (display "x > y then c = x else y = y") (newline)
 			 (display "c = ")
 			 (let ((sigma (((execute ifif) rho5) sigma5)))
 				(display (((eval id-c) rho5) sigma)) (newline)))
 
+;**************** TME 7 *********************
 
+(define testAlternative
+	(make-alternative exp10pluspetit8 const10 const7))
+
+(define testSwap
+	(make-swap id-a id-b))
+
+(define testArith-if
+	(make-arith-if const0 affect10 affect5 affect7))
+
+(begin (display "testAlter : ")
+			 (display (((eval testAlternative) emptyEnv) emptyStore)) (newline))
+
+(begin (display "testSwap : a= ")
+			 (display (((eval id-a) rho5) sigma5)) (newline)
+			 (display "b= ")
+			 (display (((eval id-b) rho5) sigma5)) (newline)
+			 (display "after a= ")
+			 (let ((sigma (((execute testSwap) rho5) sigma5)))
+				(display (((eval id-a) rho5) sigma)) (newline)
+				(display "after b= ")
+				(display (((eval id-b) rho5) sigma)) (newline)))
+
+
+(begin (display "testAffect : c= ")
+			 (display (((eval id-c) rho5) sigma5)) (newline)
+			 (display "after c= ")
+			 (let ((sigma (((execute testArith-if) rho5) sigma5)))
+				(display (((eval id-c) rho5) sigma)) (newline)))
 
 
 
